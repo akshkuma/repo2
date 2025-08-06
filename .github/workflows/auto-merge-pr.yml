@@ -32,11 +32,11 @@ jobs:
         run: |
           gh pr review ${{ github.event.pull_request.html_url }} --approve
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.REPO2_ACCESS_TOKEN }}
 
       - name: Auto-merge PR
         if: steps.check_title.outputs.should_merge == 'true'
         run: |
           gh pr merge ${{ github.event.pull_request.html_url }} --merge --delete-branch
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.REPO2_ACCESS_TOKEN }}
