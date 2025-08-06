@@ -27,6 +27,17 @@ jobs:
             echo "should_merge=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Debug Token Presence
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "GH_TOKEN is missing!"
+            exit 1
+          else
+            echo "GH_TOKEN is set."
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.PR_ACCESS_TOKEN }}
+          
       - name: Auto-approve PR
         if: steps.check_title.outputs.should_merge == 'true'
         run: |
