@@ -1,0 +1,49 @@
+name: Auto merge PRs with matching commit message
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find open PRs with commit message "archive json file"
+        id: find_prs
+        run: |
+          echo "Searching for open PRs with matching commit message..."
+
+          MATCH_MESSAGE="archive json file"
+
+          PR_NUMBERS=$(gh pr list --state open --json number --jq '.[].number' | \
+            xargs -I{} gh pr view {} --json number,commits --jq \
+            "select([.commits[].message == \"$MATCH_MESSAGE\"] | any) | .number")
+
+          if [ -z "$PR_NUMBERS" ]; then
+            echo "No matching PRs found."
+            echo "found=false" >> $GITHUB_OUTPUT
+          else
+            echo "Found matching PRs:"
+            echo "$PR_NUMBERS"
+            echo "$PR_NUMBERS" > pr_list.txt
+            echo "found=true" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge matching PRs
+        if: steps.find_prs.outputs.found == 'true'
+        run: |
+          while read PR; do
+            echo "Merging PR #$PR..."
+            gh pr merge "$PR" --merge --delete-branch || true
+          done < pr_list.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
