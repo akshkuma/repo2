@@ -1,0 +1,62 @@
+name: Merge PRs with matching commit message
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find open PRs with commit message "archive json file"
+        id: find_prs
+        run: |
+          echo "Looking for PRs with commit message: 'archive json file'"
+          MATCH_MESSAGE="archive json file"
+          MATCHING_PRS=()
+      
+          PR_NUMBERS=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --json number --jq '.[].number')
+      
+          for PR in $PR_NUMBERS; do
+            echo "Checking PR #$PR"
+      
+            COMMITS=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json commits | \
+              jq -r '[.commits[] | .messageHeadline, .message // empty]')
+      
+            MATCH=$(echo "$COMMITS" | grep -i "$MATCH_MESSAGE" || true)
+      
+            if [[ -n "$MATCH" ]]; then
+              echo "Match found in PR #$PR"
+              MATCHING_PRS+=("$PR")
+            else
+              echo "No match in PR #$PR"
+            fi
+          done
+      
+          if [ ${#MATCHING_PRS[@]} -eq 0 ]; then
+            echo "No matching PRs found."
+            echo "found=false" >> $GITHUB_OUTPUT
+          else
+            printf "%s\n" "${MATCHING_PRS[@]}" > pr_list.txt
+            echo "Matching PRs: ${MATCHING_PRS[*]}"
+            echo "found=true" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+      - name: Merge matching PRs
+        if: steps.find_prs.outputs.found == 'true'
+        run: |
+          while read PR; do
+            echo "Merging PR #$PR..."
+            gh pr merge "$PR" --merge --delete-branch || true
+          done < pr_list.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
