@@ -22,21 +22,31 @@ jobs:
           MATCH_MESSAGE="archive json file"
           MATCHING_PRS=()
       
-          # Get all open PR numbers (with --repo added)
+          # Get all open PR numbers
           PR_NUMBERS=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --json number --jq '.[].number')
-      
           echo "Found open PRs: $PR_NUMBERS"
       
           for PR in $PR_NUMBERS; do
-            echo "Checking PR #$PR..."
+            echo "---------------------------------------------"
+            echo "🔍 Checking PR #$PR"
       
-            # Get all commit messages for this PR (with --repo added)
-            COMMITS=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json commits --jq '.commits[].message')
+            # Fetch raw PR JSON (debug-friendly)
+            PR_JSON=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json commits)
+      
+            echo "Raw commits JSON for PR #$PR:"
+            echo "$PR_JSON"
+      
+            # Extract commit messages
+            COMMITS=$(echo "$PR_JSON" | jq -r '.commits[].message')
+      
+            if [ -z "$COMMITS" ]; then
+              echo "No commits found for PR #$PR"
+              continue
+            fi
       
             while IFS= read -r COMMIT_MSG; do
-              CLEAN_MSG=$(echo "$COMMIT_MSG" | tr -d '"') # remove quotes
-              echo "  Commit: $CLEAN_MSG"
-              if [[ "${CLEAN_MSG,,}" == *"${MATCH_MESSAGE,,}"* ]]; then
+              echo "Commit message: $COMMIT_MSG"
+              if [[ "${COMMIT_MSG,,}" == *"${MATCH_MESSAGE,,}"* ]]; then
                 echo "Match found in PR #$PR"
                 MATCHING_PRS+=("$PR")
                 break
@@ -54,8 +64,7 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
+    
       - name: Merge matching PRs
         if: steps.find_prs.outputs.found == 'true'
         run: |
