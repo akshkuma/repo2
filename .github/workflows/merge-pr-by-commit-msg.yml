@@ -28,30 +28,43 @@ jobs:
       
           for PR in $PR_NUMBERS; do
             echo "---------------------------------------------"
-            echo "🔍 Checking PR #$PR"
+            echo "Checking PR #$PR"
       
-            # Fetch raw PR JSON (debug-friendly)
+            # Fetch commits with both message and messageHeadline
             PR_JSON=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json commits)
       
-            echo "Raw commits JSON for PR #$PR:"
-            echo "$PR_JSON"
+            # Extract messageHeadline and message if present
+            HEADLINES=$(echo "$PR_JSON" | jq -r '.commits[].messageHeadline')
+            MESSAGES=$(echo "$PR_JSON" | jq -r '.commits[].message // empty')
       
-            # Extract commit messages
-            COMMITS=$(echo "$PR_JSON" | jq -r '.commits[].message')
+            FOUND_MATCH=false
       
-            if [ -z "$COMMITS" ]; then
-              echo "No commits found for PR #$PR"
-              continue
-            fi
-      
-            while IFS= read -r COMMIT_MSG; do
-              echo "Commit message: $COMMIT_MSG"
-              if [[ "${COMMIT_MSG,,}" == *"${MATCH_MESSAGE,,}"* ]]; then
-                echo "Match found in PR #$PR"
-                MATCHING_PRS+=("$PR")
+            # Check messageHeadline
+            while IFS= read -r LINE; do
+              echo "messageHeadline: $LINE"
+              if [[ "${LINE,,}" == *"${MATCH_MESSAGE,,}"* ]]; then
+                FOUND_MATCH=true
                 break
               fi
-            done <<< "$COMMITS"
+            done <<< "$HEADLINES"
+      
+            # If no match in messageHeadline, check full messages
+            if [[ "$FOUND_MATCH" == false ]]; then
+              while IFS= read -r LINE; do
+                echo "message: $LINE"
+                if [[ "${LINE,,}" == *"${MATCH_MESSAGE,,}"* ]]; then
+                  FOUND_MATCH=true
+                  break
+                fi
+              done <<< "$MESSAGES"
+            fi
+      
+            if [[ "$FOUND_MATCH" == true ]]; then
+              echo "Match found in PR #$PR"
+              MATCHING_PRS+=("$PR")
+            else
+              echo "No match in PR #$PR"
+            fi
           done
       
           if [ ${#MATCHING_PRS[@]} -eq 0 ]; then
