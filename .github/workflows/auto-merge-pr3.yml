@@ -1,4 +1,4 @@
-name: Auto merge the triggered PRs
+name: Auto merge the triggered PRs test
 
 on:
   workflow_dispatch:
@@ -21,7 +21,8 @@ jobs:
           echo "Searching for one open PR with title matching 'archiving JSON file'"
 
           # Using the exact line you requested with necessary fixes:
-          MATCHING_TITLE=$(gh search prs --repo "$GITHUB_REPOSITORY" 'archiving JSON file' --state open --limit 1 --json title,body --jq '.[].title | match("archiving JSON file").string')
+          # MATCHING_TITLE=$(gh search prs --repo "$GITHUB_REPOSITORY" 'archiving JSON file' --state open --limit 1 --json title,body --jq '.[].title | match("archiving JSON file").string')
+          MATCHING_TITLE=$(gh search prs ... --limit 1 --json body --jq '.[].title | match("archiving JSON file").string')
 
           if [ -z "$MATCHING_TITLE" ]; then
             echo "No matching PR found."
