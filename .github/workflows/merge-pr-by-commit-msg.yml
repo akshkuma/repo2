@@ -18,21 +18,38 @@ jobs:
       - name: Find open PRs with commit message "archive json file"
         id: find_prs
         run: |
-          echo "Searching for open PRs with matching commit message..."
-
+          echo "Searching for open PRs with commit message: archive json file"
           MATCH_MESSAGE="archive json file"
+          MATCHING_PRS=()
 
-          PR_NUMBERS=$(gh pr list --state open --json number --jq '.[].number' | \
-            xargs -I{} gh pr view {} --json number,commits --jq \
-            "select([.commits[].message == \"$MATCH_MESSAGE\"] | any) | .number")
+          # Get all open PR numbers
+          PR_NUMBERS=$(gh pr list --state open --json number --jq '.[].number')
+          
+          echo "Found open PRs: $PR_NUMBERS"
 
-          if [ -z "$PR_NUMBERS" ]; then
+          for PR in $PR_NUMBERS; do
+            echo "Checking PR #$PR..."
+
+            # Get all commit messages for this PR
+            COMMITS=$(gh pr view "$PR" --json commits --jq '.commits[].message')
+            
+            while IFS= read -r COMMIT_MSG; do
+              CLEAN_MSG=$(echo "$COMMIT_MSG" | tr -d '"') # remove quotes
+              echo "  Commit: $CLEAN_MSG"
+              if [[ "${CLEAN_MSG,,}" == *"${MATCH_MESSAGE,,}"* ]]; then
+                echo "  ✅ Match found in PR #$PR"
+                MATCHING_PRS+=("$PR")
+                break
+              fi
+            done <<< "$COMMITS"
+          done
+
+          if [ ${#MATCHING_PRS[@]} -eq 0 ]; then
             echo "No matching PRs found."
             echo "found=false" >> $GITHUB_OUTPUT
           else
-            echo "Found matching PRs:"
-            echo "$PR_NUMBERS"
-            echo "$PR_NUMBERS" > pr_list.txt
+            echo "Matching PRs: ${MATCHING_PRS[*]}"
+            printf "%s\n" "${MATCHING_PRS[@]}" > pr_list.txt
             echo "found=true" >> $GITHUB_OUTPUT
           fi
         env:
